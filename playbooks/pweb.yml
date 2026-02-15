@@ -1,0 +1,74 @@
+- hosts: all
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Ensure dependencies are installed
+      package:
+        name:
+          - bc
+          - curl
+          - expect
+          - ca-certificates
+        state: present
+
+    - name: Create Docker GPG key directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Docker's official GPG key
+      get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Add Docker repository to Apt sources
+      apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
+        state: present
+        filename: docker
+
+    - name: Update apt cache after adding Docker repository
+      apt:
+        update_cache: yes
+
+    - name: Install Docker and Docker Compose
+      package:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    - name: Ensure Docker service is enabled and started
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create Docker compose files directory
+      file:
+        path: /wg-docker
+        state: directory
+        mode: "0755"
+
+    - name: Create docker compose file
+      template:
+        src: wg-compose.yml.j2
+        dest: /wg-docker/compose.yml
+
+    - name: Start docker container
+      community.docker.docker_compose_v2:
+        project_src: /wg-docker
+        files:
+          - compose.yml
+        state: present
+        pull: missing
+        recreate: always
+
+
